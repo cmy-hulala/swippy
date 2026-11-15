@@ -93,4 +93,7 @@ export function applyI18n(root=document){
   root.querySelectorAll("[data-i18n-ph]").forEach(el=>{ el.placeholder=t(el.dataset.i18nPh) });
   root.querySelectorAll("[data-i18n-aria]").forEach(el=>{ el.setAttribute("aria-label",t(el.dataset.i18nAria)) });
   root.querySelectorAll("[data-i18n-title]").forEach(el=>{ el.title=t(el.dataset.i18nTitle) });
+  const langBtn=root.querySelector("#langBtn");
+  // 按鈕上的字是「另一種語言」：英文介面顯示「中文」，中文介面顯示 English。
+  if(langBtn) langBtn.lang=lang==="zh"?"en":"zh-Hant";
 }

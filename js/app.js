@@ -30,14 +30,22 @@ let S=load();
 function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)) }catch(_){ say("localStorage error") } }
 
 /* ---------- 狀態列（live region） ---------- */
-let sayTimer=null;
+let sayTimer=null, hideTimer=null;
+const STATUS_HIDE_MS=3000;
 function say(msg){
   const el=$("status");
+  el.classList.remove("is-quiet");
   el.textContent="";                     // 同一句話再出現也要重新讀出
   clearTimeout(sayTimer);
+  clearTimeout(hideTimer);
   const inDlg=$("setDlg").open?$("setStatus"):null;
   if(inDlg) inDlg.textContent="";
-  sayTimer=setTimeout(()=>{ el.textContent=msg; if(inDlg) inDlg.textContent=msg },30);
+  sayTimer=setTimeout(()=>{
+    el.textContent=msg;
+    if(inDlg) inDlg.textContent=msg;
+    // 畫面約 3 秒後收起，文字留在 live region，螢幕報讀不會被清掉。
+    hideTimer=setTimeout(()=>el.classList.add("is-quiet"),STATUS_HIDE_MS);
+  },30);
 }
 
 /* ---------- 設定 ---------- */
@@ -168,6 +176,7 @@ function restart(){
 function showView(v){
   $("home").hidden=v!=="home";
   $("deck").hidden=v!=="deck";
+  document.body.classList.toggle("deck-open",v==="deck");
 }
 let view="home";
 function render(){
@@ -182,15 +191,29 @@ function renderHome(){
     $("resumeBtn").textContent=t("resumeBtn",{t:deckTitle(d)});
     $("resumeMeta").textContent=t("resumeMeta",{k:d.round==="gate"?0:d.queue.length,x:d.round==="main"?d.later.length:(d.round==="gate"?d.later.length:0)});
   }else r.hidden=true;
-  const ul=$("samples"); ul.innerHTML="";
-  for(const s of SAMPLES){
-    const li=document.createElement("li");
-    const b=document.createElement("button"); b.type="button"; b.dataset.sample=s.id;
-    const n=s.items.filter(x=>x[0]!=="#").length;
-    const a=document.createElement("span"); a.textContent=s.title[getLang()]; a.lang=s.lang==="zh"?"zh-Hant":"en";
-    const m=document.createElement("span"); m.className="m"; m.textContent=t("sampleMeta",{n})+"・"+s.note[getLang()];
-    b.append(a,m); li.append(b); ul.append(li);
+  const ul=$("samples");
+  let buttons=[...ul.querySelectorAll("button[data-sample]")];
+  const same=buttons.length===SAMPLES.length && buttons.every((b,i)=>b.dataset.sample===SAMPLES[i].id);
+  if(!same){
+    ul.replaceChildren();
+    for(const s of SAMPLES){
+      const li=document.createElement("li");
+      const b=document.createElement("button"); b.type="button"; b.dataset.sample=s.id;
+      const a=document.createElement("span"); a.className="t";
+      const m=document.createElement("span"); m.className="m";
+      b.append(a,m); li.append(b); ul.append(li);
+    }
+    buttons=[...ul.querySelectorAll("button[data-sample]")];
   }
+  const labelLang=getLang()==="zh"?"zh-Hant":"en";
+  buttons.forEach((b,i)=>{
+    const s=SAMPLES[i];
+    const n=s.items.filter(x=>x[0]!=="#").length;
+    const a=b.querySelector(".t");
+    a.textContent=s.title[getLang()];
+    a.lang=labelLang;
+    b.querySelector(".m").textContent=t("sampleMeta",{n})+"・"+s.note[getLang()];
+  });
 }
 function renderDeck(){
   const d=D();
@@ -222,6 +245,10 @@ function paintCard(n,m){
   const plainOn=!!c.plain && (d.view[i]??S.settings.plain);
   const text=plainOn?c.plain:c.text;
   $("cardPos").textContent=t("cardPos",{n,m});
+  const hd=$("cardHeading");
+  hd.textContent=c.heading||"";
+  if(c.heading) hd.lang=detectLang(c.heading)==="zh"?"zh-Hant":"en";
+  else hd.removeAttribute("lang");
   const tx=$("cardText");
   tx.textContent=text;
   tx.lang=detectLang(text)==="zh"?"zh-Hant":"en";
@@ -303,9 +330,12 @@ function pickVoice(lang){
 }
 function speakCard(){
   if(!hasTTS){ say(t("fNoTTS")); return }
-  const text=$("cardText").textContent; if(!text) return;
+  const body=$("cardText").textContent;
+  const head=$("cardHeading").textContent.trim();
+  const text=head?head+"\n"+body:body;
+  if(!text) return;
   speechSynthesis.cancel();
-  const lang=detectLang(text);
+  const lang=detectLang(body||text);
   const u=new SpeechSynthesisUtterance(text);
   u.lang=lang==="zh"?"zh-TW":"en-US"; u.rate=S.settings.rate||1;
   const v=pickVoice(lang); if(v) u.voice=v;
@@ -469,6 +499,7 @@ function boot(){
   const upd=()=>{ if(!navigator.onLine){ net.hidden=false; net.textContent=t("offlineNow") } };
   addEventListener("offline",upd); addEventListener("online",()=>{ net.hidden=true }); upd();
   render();
+  document.documentElement.classList.remove("i18n-pending");
   if("serviceWorker" in navigator && location.protocol.startsWith("http")){
     navigator.serviceWorker.register("./sw.js").then(()=>navigator.serviceWorker.ready).then(()=>{
       if(navigator.onLine){ net.hidden=false; net.textContent=t("offline"); setTimeout(()=>{ if(navigator.onLine) net.hidden=true },6000) }

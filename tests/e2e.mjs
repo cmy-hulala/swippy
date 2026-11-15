@@ -12,6 +12,20 @@ const exe=process.env.CHROME||["/usr/bin/google-chrome","C:/Program Files/Google
 const browser=await chromium.launch({executablePath:exe,headless:true});
 const ctx=await browser.newContext({viewport:{width:1280,height:900}});
 const page=await ctx.newPage();
+await page.addInitScript(()=>{
+  window.__cls=0;
+  try{
+    new PerformanceObserver(list=>{
+      for(const e of list.getEntries()) if(!e.hadRecentInput) window.__cls+=e.value;
+    }).observe({type:"layout-shift",buffered:true});
+  }catch(_){}
+});
+async function inView(p,sel){
+  const vp=p.viewportSize();
+  const b=await p.locator(sel).boundingBox();
+  const fit=!!b && b.y>=-1 && (b.y+b.height)<=vp.height+1 && b.x>=-1 && (b.x+b.width)<=vp.width+1;
+  return {fit,b,vp};
+}
 const errors=[]; page.on("pageerror",e=>errors.push(String(e))); page.on("console",m=>{ if(m.type()==="error") errors.push(m.text()) });
 const status=()=>page.locator("#status").textContent();
 const prog=()=>page.locator("#progText").textContent();
@@ -26,6 +40,9 @@ async function axe(label){
 
 try{
 await page.goto(BASE,{waitUntil:"load"});
+await sleep(400);
+const cls=await page.evaluate(()=>window.__cls||0);
+ok("首頁載入 CLS < 0.1", cls<0.1, cls.toFixed(3));
 ok("頁面標題含 Swippy", (await page.title()).includes("Swippy"));
 const vp=await page.locator('meta[name=viewport]').getAttribute("content");
 ok("viewport 允許縮放", !/user-scalable=no|maximum-scale/.test(vp), vp);
@@ -41,9 +58,11 @@ await page.waitForSelector("#deck:not([hidden])");
 ok("焦點移到卡片區", await page.evaluate(()=>document.activeElement?.id==="stage"));
 const focusRing=await page.evaluate(()=>getComputedStyle(document.activeElement).outlineStyle);
 ok("焦點框可見", focusRing!=="none", focusRing);
-ok("進度文字", (await prog()).includes("第 1 張 / 共 36 張"), await prog());
+const total=await page.evaluate(()=>window.__swippy.state.deck.cards.length);
+ok("進度文字", (await prog()).includes(`第 1 張 / 共 ${total} 張`), await prog());
+ok("第一張是句子而不是單獨標題", (await page.locator("#plainBtn").isVisible()) && ((await page.locator("#cardHeading").textContent())||"").trim().length>0 && !(await page.locator("#cardBadge").textContent()).includes("章節"));
 ok("卡片 aria-live=polite", (await page.locator("#cardLive").getAttribute("aria-live"))==="polite");
-ok("卡片內含位置說明", (await page.locator("#cardPos").textContent()).includes("第 1 張，共 36 張"));
+ok("卡片內含位置說明", (await page.locator("#cardPos").textContent()).includes(`第 1 張，共 ${total} 張`));
 await axe("卡片畫面");
 await page.screenshot({path:OUT+"02-card.png"});
 
@@ -103,7 +122,7 @@ ok("重新整理後出現「繼續上次」", await page.locator("#resume").isVi
 await page.locator("#resumeBtn").click(); await sleep(200);
 ok("繼續上次＝同一進度", (await prog())===p3, p3+" vs "+await prog());
 // 讀完主牌組 → 稍後再看 → 摘要
-for(let i=0;i<60;i++){ const r=await page.evaluate(()=>window.__swippy.state.deck.round); if(r!=="main") break; await page.keyboard.press(i%3===0?"ArrowLeft":"ArrowRight"); await sleep(260) }
+for(let i=0;i<120;i++){ const r=await page.evaluate(()=>window.__swippy.state.deck.round); if(r!=="main") break; await page.keyboard.press(i%3===0?"ArrowLeft":"ArrowRight"); await sleep(260) }
 ok("主牌組讀完出現稍後再看", await page.locator("#laterGate").isVisible());
 await axe("稍後再看入口");
 await page.locator("#laterGo").click(); await sleep(150);
@@ -123,7 +142,7 @@ await page.locator("#anotherBtn").click();
 await page.fill("#paste","# 第一節\n供給增加，價格下降。需求增加，價格上升！Dr. Lee said the price rose 3.5 percent. Then it fell again.\n- 條列一的內容\n- 條列二的內容");
 await page.locator("#splitBtn").click(); await sleep(200);
 const n=await page.evaluate(()=>window.__swippy.state.deck.cards.length);
-ok("貼上文字切成卡片", n===7, "cards="+n);
+ok("貼上文字切成卡片（標題併入下一張）", n===6, "cards="+n);
 await page.keyboard.press("ArrowRight"); await sleep(300);
 await page.keyboard.press("p"); await sleep(100);
 ok("貼上文字按 P 會說明沒有白話版", (await status()).includes("白話版只有範例有"), await status());
@@ -137,8 +156,10 @@ await page.keyboard.press("Escape");
 ok("字級 30px", (await page.locator("#cardText").evaluate(el=>getComputedStyle(el.parentElement).fontSize))==="30px");
 await axe("高對比＋特大字");
 await page.screenshot({path:OUT+"04-hc.png"});
+ok("中文介面時語言鈕是 English 且 lang=en", (await page.locator("#langBtn").textContent()).trim()==="English" && (await page.locator("#langBtn").getAttribute("lang"))==="en");
 await page.locator("#langBtn").click(); await sleep(100);
 ok("英文介面", (await page.locator(".act.a-ok").textContent()).includes("Got it") && (await page.evaluate(()=>document.documentElement.lang))==="en");
+ok("英文介面時語言鈕是中文且 lang=zh-Hant", (await page.locator("#langBtn").textContent()).trim()==="中文" && (await page.locator("#langBtn").getAttribute("lang"))==="zh-Hant");
 await page.locator('#setBtn').click(); await page.locator('input[name=theme][value="light"]').check(); await page.keyboard.press("Escape");
 await axe("英文＋淺色");
 await page.screenshot({path:OUT+"05-en-light.png"});
@@ -163,6 +184,44 @@ await p3b.screenshot({path:OUT+"06-mobile.png"});
 const r3=await new AxeBuilder({page:p3b}).withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze();
 ok("axe 無違規：手機卡片畫面", r3.violations.length===0, r3.violations.map(x=>x.id).join(","));
 ok("沒有 JS 錯誤", errors.length===0, errors.join(" | "));
+// 200% 縮放以 CSS 視窗 640×400 代表（1280×800 的一半）；320×640 代表小手機
+async function deckFits(p,label){
+  await p.goto(BASE,{waitUntil:"load"});
+  await p.locator('button[data-sample="psych-wm"]').click();
+  await p.waitForSelector("#deck:not([hidden])");
+  await sleep(400);
+  const actions=await inView(p,".actions");
+  ok(`${label}：四個動作鈕在視窗內`, actions.fit, JSON.stringify({b:actions.b,h:actions.vp.height,w:actions.vp.width}));
+  const read=await inView(p,"#readBtn");
+  const tts=await p.evaluate(()=>("speechSynthesis" in window)&&typeof SpeechSynthesisUtterance==="function");
+  if(tts) ok(`${label}：朗讀鈕在視窗內`, read.fit, JSON.stringify(read.b));
+  const status=await p.locator("#status").boundingBox();
+  const overlaps=read.b && status && status.width>2 && status.height>2 && read.b.y<status.y+status.height && read.b.y+read.b.height>status.y && read.b.x<status.x+status.width && read.b.x+read.b.width>status.x;
+  ok(`${label}：狀態列沒有蓋住朗讀鈕`, !overlaps);
+  const wide=await p.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1);
+  ok(`${label}：沒有水平捲動`, wide);
+  const ax=await new AxeBuilder({page:p}).withTags(["wcag2a","wcag2aa","wcag21a","wcag21aa","wcag22aa","best-practice"]).analyze();
+  ok(`axe 無違規：${label}`, ax.violations.length===0, ax.violations.map(x=>`${x.id}(${x.impact})`).join(", "));
+}
+const ctxZ=await browser.newContext({viewport:{width:640,height:400}});
+const pZ=await ctxZ.newPage();
+await deckFits(pZ,"200% 縮放 640×400");
+await pZ.keyboard.press("ArrowRight");
+await sleep(200);
+ok("動作後狀態列有文字", (await pZ.locator("#status").textContent()).includes("已讀懂"));
+await sleep(3400);
+const quiet=await pZ.locator("#status").evaluate(el=>({
+  quiet:el.classList.contains("is-quiet"),
+  text:el.textContent||"",
+  live:el.getAttribute("aria-live"),
+  clipped:getComputedStyle(el).position==="absolute"
+}));
+ok("約 3 秒後狀態文字視覺收起，live region 仍留著", quiet.quiet && quiet.clipped && quiet.live==="polite" && quiet.text.includes("已讀懂"), JSON.stringify(quiet));
+await ctxZ.close();
+const ctxN=await browser.newContext({viewport:{width:320,height:640}});
+const pN=await ctxN.newPage();
+await deckFits(pN,"320×640 小手機");
+await ctxN.close();
 }catch(e){ ok("測試流程中斷",false,String(e).split("\n")[0]) }
 await browser.close();
 console.log(results.join("\n"));
