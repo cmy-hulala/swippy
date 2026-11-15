@@ -3,8 +3,8 @@
  * - 斷句：中文 。！？；…，英文 . ! ?（後面接空白或換行）；空行與換行是段落切點
  * - 不誤切：e.g. i.e. Dr. Mr. Mrs. etc. vs. U.S.、小數 3.14、網址、結尾引號（。」 ." 跟著前一句）
  * - 太短（中文 < 6 字、英文 < 4 個字）併到前一句；太長（中文 > 120 字、英文 > 40 個字）在 ， , ; ： 處再切
- * - 列表項目（- * • 1.）每項一張；# 標題變成章節卡 {sec:true}
- * 回傳 [{text, sec?, cont?}]；cont=true 表示是上一句被切開的後半段。
+ * - 列表項目（- * • 1.）每項一張；# 標題不單獨成卡，寫進下一張的 heading（文末沒有句子的標題才留成 {sec:true}）
+ * 回傳 [{text, sec?, cont?, heading?}]；cont=true 表示是上一句被切開的後半段。
  */
 const CJK_RE=/[\u3400-\u9fff\uf900-\ufaff]/;
 const CJK_G=/[\u3400-\u9fff\uf900-\ufaff]/g;
@@ -91,8 +91,15 @@ function joinText(a,b){ return (CJK_RE.test(a.slice(-1))||CJK_RE.test(b[0])) ? a
 export function splitText(text, {chunk=true}={}){
   const {out, restore}=protect(String(text??"").replace(/\r\n?/g,"\n").replace(/\u00a0/g," "));
   const cards=[];
+  let pending=null;
+  const takeHeading=()=>{
+    if(!pending) return null;
+    const h=restore(pending).trim();
+    pending=null;
+    return h||null;
+  };
   for(const b of blocks(out)){
-    if(b.kind==="sec"){ cards.push({text:restore(b.text), sec:true}); continue }
+    if(b.kind==="sec"){ pending=pending?pending+" — "+b.text:b.text; continue }
     let ss=b.kind==="item" ? [b.text] : sentences(b.text);
     // 太短併到前一句（同一段內）；段首太短就併到下一句
     const merged=[];
@@ -101,14 +108,25 @@ export function splitText(text, {chunk=true}={}){
       else merged.push(s);
     }
     if(merged.length>1 && isShort(merged[0])){ const f=merged.shift(); merged[0]=joinText(f,merged[0]) }
+    let firstOfBlock=true;
     for(const s of merged){
       const parts=chunk?chunkLong(s):[s];
       parts.forEach((pt,k)=>{
         const t=restore(pt).trim();
         if(!t || /^[\s\p{P}\p{S}]*$/u.test(t)) return;
-        cards.push(k>0?{text:t,cont:true}:{text:t});
+        const card=k>0?{text:t,cont:true}:{text:t};
+        if(firstOfBlock){
+          const h=takeHeading();
+          if(h) card.heading=h;
+          firstOfBlock=false;
+        }
+        cards.push(card);
       });
     }
+  }
+  if(pending){
+    const h=restore(pending).trim();
+    if(h && !/^[\s\p{P}\p{S}]*$/u.test(h)) cards.push({text:h,sec:true});
   }
   return cards;
 }

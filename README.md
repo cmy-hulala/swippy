@@ -6,6 +6,10 @@ Built for **AccessED Hacks** (education accessibility). It is a static web app (
 
 > Learner we designed for: university students with ADHD who give up on long readings. It may also help readers with dyslexia or anyone who finds dense text overwhelming, but it was not designed or tested specifically for them.
 
+## Changelog
+
+- 2026-11-15: Sample buttons are in the first HTML paint (no jump when the script runs). The status line hides after about 3 seconds; the live-region text stays for screen readers. Action buttons stay on screen at 200% zoom and on small phones. The language button’s `lang` matches the words on it (`English` / `中文`). A heading is context on the next card, not its own card. The two fictional handouts are longer. Service worker cache is `swippy-v2`.
+
 ## How to use
 
 1. Open the app and either **pick a sample** (3 included) or **paste your own text** and press **Make cards**.
@@ -45,7 +49,7 @@ The whole flow (start, pick a sample, read, summary, copy) works with the keyboa
 - Settings (saved locally): 3 text sizes (19 / 24 / 30 px), dark / light / **high-contrast** theme, **reduce motion** (also follows `prefers-reduced-motion`; cards change instantly with no flying or rotation), read each card aloud automatically, and speech rate.
 - Zoom is allowed (no `user-scalable=no`), and card text is selectable.
 - Native `<dialog>` with focus trapping and `Esc` to close. There is a skip link, and all controls are at least 40–44 px tall.
-- Low bandwidth: no external fonts, scripts or CDNs. The whole site is under 100 KB, and a service worker caches it for offline use.
+- Low bandwidth: no external fonts, scripts or CDNs. The whole site is under 120 KB, and a service worker caches it for offline use.
 - Privacy: nothing leaves the browser. **Delete my data** on the start screen wipes everything.
 - UI in Traditional Chinese (default) and English (button in the header, or open `?lang=en`).
 
@@ -72,7 +76,7 @@ GitHub Pages: serve the repository root as-is. All paths are relative, so it als
 ### Tests
 
 ```bash
-node --test tests/split.test.mjs        # 16 sentence-splitter unit tests (zh + en)
+node --test tests/split.test.mjs        # sentence-splitter unit tests (zh + en)
 cd tests && npm install && npm run e2e  # Playwright + axe-core end-to-end check (needs Chrome/Edge and the server above)
 ```
 
@@ -83,7 +87,7 @@ The e2e script drives the app without any login: keyboard-only flow, all four ac
 - Splits on `。！？；…` and on `. ! ?` followed by whitespace. Blank lines and line breaks are paragraph boundaries, and hard-wrapped lines are re-joined.
 - Does not split on `e.g.` `i.e.` `Dr.` `Mr.` `Mrs.` `etc.` `vs.` `U.S.`, decimals (`3.14`), URLs, or closing quotes (`。」` `."` stay with their sentence).
 - Merges very short fragments (Chinese < 6 characters, English < 4 words) into the previous sentence. Re-splits very long ones (Chinese > 120 characters, English > 40 words) at `，` `,` `;` `：` (option "Split very long sentences").
-- Each list item (`-` `*` `1.`) becomes its own card. A `#` heading becomes a **section card**.
+- Each list item (`-` `*` `1.`) becomes its own card. A `#` heading is shown as context on the next card, not as a card of its own. A heading with nothing after it is still a section card.
 
 ## Limitations
 
@@ -118,6 +122,8 @@ No third-party code ships in the app. The tests use `playwright-core` (Apache-2.
 
 **Swippy**：把讀不下去的長講義切成「一次一句」的卡片，像滑卡一樣一張一張滑完，幫 ADHD 學生把長文讀到最後。純靜態網頁，不用登入、不用 API key、不追蹤；資料只存在瀏覽器的 localStorage，第一次開過之後可以離線使用。
 
+**更新（2026-11-15）**：範例按鈕改寫在 HTML 裡，第一屏不再被腳本撐開；狀態文字約 3 秒後收起，螢幕報讀用的文字還留著；放大到 200% 或小手機時，四個動作鈕留在畫面裡；語言鈕的 `lang` 跟著按鈕上的字（English／中文）；標題併進下一張，不再單獨佔一張卡；兩篇虛構講義加長；離線快取改為 `swippy-v2`。
+
 **怎麼用**：選一篇範例，或貼上自己的文字後按「切成卡片」。每張卡做一個動作：
 
 - 右滑或 `→`：懂了
@@ -140,7 +146,7 @@ No third-party code ships in the app. The tests use `playwright-core` (Apache-2.
 - 每個動作都有按鈕、鍵盤和文字回饋，卡片內容在 aria-live 區域。
 - 字級有 3 段，主題有深色、淺色、高對比三種，可以減少動態（也會跟隨系統設定）。
 - 可以縮放畫面，卡片文字可以選取。
-- 全站小於 100 KB，不載入任何外部資源。
+- 全站小於 120 KB，不載入任何外部資源。
 
 **限制**：
 

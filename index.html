@@ -10,6 +10,23 @@
 <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
 <link rel="stylesheet" href="./css/app.css">
+<script>
+/* 英文介面（網址或上次的設定）先藏起內文，等翻譯套上再顯示，避免字數不同把版面撐開。 */
+(function(){
+  try{
+    var q=new URLSearchParams(location.search).get("lang");
+    var lang=q==="en"||q==="zh"?q:"";
+    if(!lang){
+      var s=JSON.parse(localStorage.getItem("swippy:v1")||"null");
+      if(s&&s.v===1&&s.settings&&(s.settings.lang==="en"||s.settings.lang==="zh")) lang=s.settings.lang;
+    }
+    if(lang==="en"){
+      document.documentElement.classList.add("i18n-pending");
+      setTimeout(function(){ document.documentElement.classList.remove("i18n-pending"); },2500);
+    }
+  }catch(e){}
+})();
+</script>
 <script type="module" src="./js/app.js"></script>
 </head>
 <body>
@@ -39,7 +56,11 @@
 
     <section class="panel" aria-labelledby="samplesH">
       <h3 id="samplesH" data-i18n="samplesH">選一篇範例</h3>
-      <ul id="samples" class="samples"></ul>
+      <ul id="samples" class="samples">
+        <li><button type="button" data-sample="psych-wm"><span class="t" lang="zh-Hant">心理學導論 第 3 週：工作記憶（虛構英文講義）</span><span class="m">78 張卡・有白話版・本專案自行撰寫的虛構講義</span></button></li>
+        <li><button type="button" data-sample="econ-sd"><span class="t" lang="zh-Hant">經濟學原理 第 4 週：供給與需求（虛構中文講義）</span><span class="m">81 張卡・有白話版・本專案自行撰寫的虛構講義</span></button></li>
+        <li><button type="button" data-sample="gettysburg"><span class="t" lang="zh-Hant">林肯〈蓋茲堡演說〉1863（公有領域，英文）</span><span class="m">12 張卡・有白話版・美國公有領域文字（Bliss 版）；白話版由本專案撰寫</span></button></li>
+      </ul>
     </section>
 
     <section class="panel" aria-labelledby="pasteH">
@@ -71,7 +92,7 @@
         <div class="stamp s-up" aria-hidden="true" data-i18n="stampLater">稍後</div>
         <div class="stamp s-down" aria-hidden="true" data-i18n="stampSkip">略過</div>
         <p id="cardBadge" class="badge"></p>
-        <div id="cardLive" class="body" aria-live="polite" aria-atomic="true"><span id="cardPos" class="sr-only"></span><span id="cardText"></span></div>
+        <div id="cardLive" class="body" tabindex="0" aria-live="polite" aria-atomic="true"><span id="cardPos" class="sr-only"></span><span id="cardHeading" class="card-heading"></span><span id="cardText"></span></div>
         <div class="card-tools">
           <button type="button" id="plainBtn" aria-pressed="false" aria-keyshortcuts="P"></button>
           <button type="button" id="readBtn" aria-pressed="false" aria-keyshortcuts="R"></button>
