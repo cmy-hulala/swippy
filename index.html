@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1419">
+<meta name="description" content="Swippy：把長文切成一次一句的卡片，像滑卡一樣讀完。For students with ADHD who struggle with long readings. 免登入、可離線。">
+<title>Swippy｜一次一句，把長文讀完</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<link rel="stylesheet" href="./css/app.css">
+<script type="module" src="./js/app.js"></script>
+</head>
+<body>
+<a class="skip" href="#main" data-i18n="skip">跳到主要內容</a>
+<header class="top">
+  <h1 class="brand"><a href="./" id="homeLink"><span aria-hidden="true">🃏</span> Swippy</a></h1>
+  <span id="net" class="net" hidden></span>
+  <nav class="tools" aria-label="Swippy">
+    <button type="button" id="homeBtn" data-i18n="home">首頁</button>
+    <button type="button" id="helpBtn" aria-keyshortcuts="?" data-i18n="help">鍵盤說明</button>
+    <button type="button" id="setBtn" data-i18n="settings">設定</button>
+    <button type="button" id="langBtn" lang="en" data-i18n="langBtn" data-i18n-aria="langBtnAria">English</button>
+  </nav>
+</header>
+
+<main id="main" tabindex="-1">
+  <!-- 開始畫面 -->
+  <section id="home" aria-labelledby="homeH">
+    <h2 id="homeH" class="tagline" data-i18n="tagline">把讀不下去的長文，切成一次一句的卡片，一張一張滑完。</h2>
+    <p class="privacy" data-i18n="privacy">文字只存在你的瀏覽器（localStorage），不需登入、不會上傳任何資料。</p>
+
+    <section id="resume" class="panel" aria-labelledby="resumeH" hidden>
+      <h3 id="resumeH" data-i18n="resumeH">繼續上次</h3>
+      <button type="button" id="resumeBtn" class="big-btn"></button>
+      <p id="resumeMeta" class="meta"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="samplesH">
+      <h3 id="samplesH" data-i18n="samplesH">選一篇範例</h3>
+      <ul id="samples" class="samples"></ul>
+    </section>
+
+    <section class="panel" aria-labelledby="pasteH">
+      <h3 id="pasteH" data-i18n="pasteH">貼上自己的文字</h3>
+      <label for="paste" data-i18n="pasteLabel">把講義、文章或筆記貼在這裡</label>
+      <textarea id="paste" rows="7" data-i18n-ph="pastePh" aria-describedby="pasteNote"></textarea>
+      <p id="pasteNote" class="meta" data-i18n="pastePlainNote">白話版只有範例有（貼上的文字不會呼叫任何 AI）。</p>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="chunk" checked> <span data-i18n="chunk">長句自動再切短</span></label>
+        <button type="button" id="splitBtn" class="primary" data-i18n="splitBtn">切成卡片</button>
+      </div>
+    </section>
+
+    <p class="row"><button type="button" id="clearBtn" class="danger" data-i18n="clearData">清除我的資料</button></p>
+  </section>
+
+  <!-- 卡片畫面 -->
+  <section id="deck" aria-labelledby="deckTitle" hidden>
+    <div class="deckbar">
+      <h2 id="deckTitle"></h2>
+      <p class="prog"><span id="progText"></span><span id="laterText" class="later-count"></span></p>
+      <progress id="progBar" max="1" value="0" data-i18n-aria="progAria"></progress>
+    </div>
+
+    <div id="stage" tabindex="0" data-i18n-aria="stageAria" aria-describedby="keysHint">
+      <article id="card" class="card">
+        <div class="stamp s-right" aria-hidden="true" data-i18n="stampOk">懂了</div>
+        <div class="stamp s-left" aria-hidden="true" data-i18n="stampStar">★ 重點</div>
+        <div class="stamp s-up" aria-hidden="true" data-i18n="stampLater">稍後</div>
+        <div class="stamp s-down" aria-hidden="true" data-i18n="stampSkip">略過</div>
+        <p id="cardBadge" class="badge"></p>
+        <div id="cardLive" class="body" aria-live="polite" aria-atomic="true"><span id="cardPos" class="sr-only"></span><span id="cardText"></span></div>
+        <div class="card-tools">
+          <button type="button" id="plainBtn" aria-pressed="false" aria-keyshortcuts="P"></button>
+          <button type="button" id="readBtn" aria-pressed="false" aria-keyshortcuts="R"></button>
+        </div>
+      </article>
+
+      <div id="laterGate" class="gate" hidden>
+        <h3 data-i18n="laterH" tabindex="-1" id="laterH">主牌組讀完了！</h3>
+        <p id="laterP"></p>
+        <div class="row">
+          <button type="button" id="laterGo" class="primary" data-i18n="laterGo">開始稍後再看</button>
+          <button type="button" id="laterSkip" data-i18n="laterSkip">略過，看摘要</button>
+        </div>
+      </div>
+
+      <div id="summary" class="gate" hidden>
+        <h3 data-i18n="doneH" tabindex="-1" id="doneH">讀完了！</h3>
+        <dl id="stats" class="stats"></dl>
+        <h4 id="starsH" data-i18n="starsH">重點句 ★</h4>
+        <ol id="stars" class="stars" tabindex="0" aria-labelledby="starsH"></ol>
+        <div class="row">
+          <button type="button" id="copyBtn" class="primary" data-i18n="copy">複製重點</button>
+          <button type="button" id="dlBtn" data-i18n="download">下載 .txt</button>
+          <button type="button" id="againBtn" data-i18n="again">再讀一次</button>
+          <button type="button" id="anotherBtn" data-i18n="another">換一篇</button>
+        </div>
+      </div>
+    </div>
+
+    <p id="keysHint" class="hint" data-i18n="keysHint"></p>
+
+    <div class="actions" role="group" data-i18n-aria="actionsAria">
+      <button type="button" class="act a-star" data-act="star" aria-keyshortcuts="ArrowLeft"><span data-i18n="aStar"></span><span class="sr-only" data-i18n="aStarFull"></span></button>
+      <button type="button" class="act a-later" data-act="later" aria-keyshortcuts="ArrowUp"><span data-i18n="aLater"></span><span class="sr-only" data-i18n="aLaterFull"></span></button>
+      <button type="button" class="act a-skip" data-act="skip" aria-keyshortcuts="ArrowDown"><span data-i18n="aSkip"></span><span class="sr-only" data-i18n="aSkipFull"></span></button>
+      <button type="button" class="act a-ok" data-act="ok" aria-keyshortcuts="ArrowRight"><span data-i18n="aOk"></span><span class="sr-only" data-i18n="aOkFull"></span></button>
+      <button type="button" class="act a-undo" id="undoBtn" aria-keyshortcuts="Z" data-i18n="aUndo"></button>
+    </div>
+  </section>
+</main>
+
+<p id="status" class="status" role="status" aria-live="polite"></p>
+
+<dialog id="helpDlg" aria-labelledby="helpH">
+  <h2 id="helpH" data-i18n="helpH">鍵盤與手勢說明</h2>
+  <table class="keys"><tbody id="helpRows"></tbody></table>
+  <p class="meta" data-i18n="helpFoot"></p>
+  <form method="dialog"><button class="primary" data-i18n="close">關閉</button></form>
+</dialog>
+
+<dialog id="setDlg" aria-labelledby="setH">
+  <h2 id="setH" data-i18n="settingsH">顯示與朗讀設定</h2>
+  <fieldset><legend data-i18n="fontSize">字級</legend>
+    <label class="check"><input type="radio" name="fs" value="1"> <span data-i18n="fs1"></span> (19px)</label>
+    <label class="check"><input type="radio" name="fs" value="2"> <span data-i18n="fs2"></span> (24px)</label>
+    <label class="check"><input type="radio" name="fs" value="3"> <span data-i18n="fs3"></span> (30px)</label>
+  </fieldset>
+  <fieldset><legend data-i18n="theme">主題</legend>
+    <label class="check"><input type="radio" name="theme" value="dark"> <span data-i18n="thDark"></span></label>
+    <label class="check"><input type="radio" name="theme" value="light"> <span data-i18n="thLight"></span></label>
+    <label class="check"><input type="radio" name="theme" value="hc"> <span data-i18n="thHc"></span></label>
+  </fieldset>
+  <label class="check"><input type="checkbox" id="setMotion"> <span data-i18n="motion"></span></label>
+  <label class="check" id="autoReadRow"><input type="checkbox" id="setAutoRead"> <span data-i18n="autoRead"></span></label>
+  <label class="check"><input type="checkbox" id="setPlain"> <span data-i18n="plainDefault"></span></label>
+  <p id="rateRow" class="row"><label for="setRate" data-i18n="rate">朗讀速度</label>
+    <select id="setRate"><option value="0.8">0.8×</option><option value="1">1×</option><option value="1.2">1.2×</option><option value="1.5">1.5×</option></select></p>
+  <p id="setStatus" class="meta" role="status" aria-live="polite"></p>
+  <form method="dialog"><button class="primary" data-i18n="close">關閉</button></form>
+</dialog>
+</body>
+</html>
