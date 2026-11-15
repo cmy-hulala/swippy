@@ -1,0 +1,7 @@
+{
+  "name": "swippy-tests",
+  "private": true,
+  "type": "module",
+  "scripts": { "unit": "node --test split.test.mjs", "e2e": "node e2e.mjs" },
+  "devDependencies": { "playwright-core": "^1.49.0", "@axe-core/playwright": "^4.10.0" }
+}
